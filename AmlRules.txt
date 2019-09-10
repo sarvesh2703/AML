@@ -1,0 +1,66 @@
+Analysis Steps	Resolution Steps
+1)      Logged into AML Oracle DB and checked the output of the following:	1)      We removed all the .dat files present at etldata path on wwhamloraprod1 server. 
+	
+2)      select * from AML_Process_Runs order by Time_Started desc	2)      We fetched the File_Merge file from XML’s archive path for 31st Dec 2016 and noted down the files processed.
+	
+3)      Status column in the output showed that there is an ERROR in the AML upload processing.	3)      We copied all those listed files from XML’s archive path to XML.
+	
+4)      Verified the DB log entries by running following:	4)      We ran Rules Engine for all the files except SALT EUR as those were the culprit of the failure.
+	
+5)      select * from AML_Process_Logs order by Time_Logged desc	5)      We verified that all the processed files are present in worketl directory at XML path.
+	
+6)      We received the following message: ORA-00001: unique constraint (AML.TXN_PK) violated	6)      We took its backup before processing further so that we don’t need to regenerate it through XML if required to run again in case of any failure.
+	
+7)      The above mentioned output indicated that there could be duplicate entries in the files we have received, to cross verify that we fired the following:	7)      We counted the number of transaction by running the following command wc –l *Transaction* to make sure we do not overload the AML Daily run process (upto 1.4  lacs transactions are fine).
+	
+8)      select source_txn_unique_id, count(source_txn_unique_id) from aml_ext_transactions	8)      Before moving further we commented the sftp of AML_DAILY_RUN shell script, so that it won’t update the profiling file. (This is mandatory if you are running AML DAILY Run process multiple times in a day)
+group by source_txn_unique_id having count(source_txn_unique_id) > 1	
+	9)      We created AML_Procstatus.txt file at the required path and put the valid entries of the files to be processed.
+9)      The above mentioned query returned us the number of duplicate records in the .dat files.	
+	10)  We manually ran the Merge job, it created .dat files in etldata.
+10)  There were 614 duplicate records of SALT transactions.	
+	11)  Then we triggered the backup dat, duplicate removal jobs as per its sequence, verified the duplicate removal logs.
+	
+	12)  Everything looked ok then we processed the files by triggering AML Daily Upload job.
+	
+	13)  Once it was successful, we approached SALT team to understand why duplicate records are generated and to know if they can provide the corrected files.
+	
+	14)  SALT team informed that as their job could not run on time, the files which were generated later caused duplication, however they were not in a position to provide us the corrected files.
+	
+	15)  We then approached AML testing team, they verified the data and confirmed that the 31st Dec file contains some of the 30th Dec records too.
+	
+	16)  Thus we processed 30th Dec SALT file through all the above mentioned processes and then processed the 31st Dec file, by doing this our duplicate removal job could remove the duplicates from
+	31st Dec file (as it only removes duplicates against the records stored in DB).
+	
+	17)  Finally after following all the above mentioned steps our issue was resolved, we did uncomment the sftp in the AML Daily upload shell script to allow it to update profiling for that day’s run.
+	
+	
+Daily Rules: 
+	R2:  Defn:  DailyTxnSum.acc.day.total > TravelexParameters.R2Sum. 
+It gets triggered if the sum of transactions amount  for the last 90 days is greater than the threshold value set in R2Sum.
+	R10 : This has 7 internal rules inside it. Rules apply on current to last 6 days transactions.  
+	R10 get triggers when sum of last 7 days transactions amount is >  R10 Transaction Value 
+				AND
+		Transactions count > R10 Transaction Count 
+
+
+	R11: This rule applies on current and last 1 day transactions.
+	Defn: DailyTxnCountIn7DWind.cnt.day.past1> TravelexParameters.DailyTxnCount
+					AND
+		TxnBranchCount.size>TravelexParameters.TxnLocationCount
+
+	R12 :  It triggers if customer performs more than 5 transactions within 7 days. 
+	TxnCountIn7DWind.cnt.day.total > TravelexParameters.TxnCountIn7DWind
+
+	R20: This rule gets triggered for monitored customers only. If they perform any transaction it gets triggered.
+
+Monthly Rules:
+	R8: Number of W&D originating from a single Sender over the last month > 6
+	R7: Number of distinct W&D to a single Beneficiary over the last month >6
+	
+	"R8 : Repeat sender last mth " +  OrgUnit.value + ". Number of W&amp;D originating from a single Sender over the last month " 
++ MonthlyCountSender.cnt.month.present + "."</value>
+	
+	
+	
+	
