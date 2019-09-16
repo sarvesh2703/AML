@@ -55,7 +55,7 @@ It gets triggered if the sum of transactions amount  for the last 90 days is gre
 	R20: This rule gets triggered for monitored customers only. If they perform any transaction it gets triggered.
 
 Monthly Rules:
-	R8: Number of W&D originating from a single Sender over the last month > 6
+	R8: Number of W&D (widthdraw/deposite)originating from a single Sender over the last month > 6
 	R7: Number of distinct W&D to a single Beneficiary over the last month >6
 	
 	"R8 : Repeat sender last mth " +  OrgUnit.value + ". Number of W&amp;D originating from a single Sender over the last month " 
